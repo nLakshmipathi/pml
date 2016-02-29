@@ -1,0 +1,88 @@
+---
+output: html_document
+---
+
+## **Project Report:Practicle Machine Learning**
+#This is an R Markdown document. created by Naresh Nelaturi to generate #a dynamic report for the coursera practicle machine learning #assignment.
+## **Project: Problem Statement**
+#Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har 
+#**Data for the Project**
+#The model has to be devloped for the data from the following source
+#http://groupware.les.inf.puc-rio.br/har
+#The training data for this project are available here:
+#**Training Dataset Source**
+#https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+#**Testing Dataset Source**
+#https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+```{r}
+library("AppliedPredictiveModeling", lib.loc="~/R/win-library/3.2")
+library("caret", lib.loc="~/R/win-library/3.2")
+library("doParallel", lib.loc="~/R/win-library/3.2")
+library("randomForest", lib.loc="~/R/win-library/3.2")
+#Load the Data
+dat_tr <- read.csv(file = "D:/pml-training.csv", na.strings=c("#DIV/0!"))
+dat_ts<-read.csv(file="D:/pml-testing.csv",na.string=c("#DIV/0!"))
+#Display the information of the data
+dim(dat_tr)
+dim(dat_ts)
+
+```
+#removing the predictors with NAs
+#removing the variales/predicotrs having more than 50% NULL Values in trainig and test dataset
+```{r}
+dat_na1<-dat_tr[,colMeans(is.na(dat_tr))<= .50]
+dat_na2<-dat_ts[,colMeans(is.na(dat_tr))<= .50]
+```
+##removing the predictors having less information
+#Identifying & removing predicotrs having the near to zero variance in training and test dataset
+```{r}
+nz1<-nearZeroVar(dat_na1)
+nz2<-nearZeroVar(dat_na2)
+dat_nz1<-dat_na1[,-nz1]
+dat_nz2<-dat_na2[,-nz2]
+```
+#removing predictors which are acting as indicators in training and test datasets
+```{r}
+dat_r<-dat_nz1[,-c(1:6)]
+dat_s<-dat_nz2[,-c(1:6)]
+```
+## Parllel computation
+#To increase the speed of the computation make use of the doParllel package,create cluster of cores and execute the instructions on each core
+```{r}
+cl<-makeCluster(3)
+registerDoParallel(cl)
+```
+## partition the data into training and validation dataset to evalute the model performance for the given dataset
+```{r}
+tr<- createDataPartition(dat_r$classe, p = .75, list=FALSE)
+tr_tr<-dat_r[tr,]
+tr_ts<-dat_r[-tr,]
+```
+## Learning Algorithm : Random Forest
+#train the algorithm using the random forest technique,tune the model to increase the performance and to reduce computation time
+```{r}
+x <- tr_tr[,-53]
+y <- tr_tr[,53]
+fitControl <-trainControl(method = "cv", number = 5,allowParallel=TRUE)
+fit <- train(x,y, method="rf",data=tr_tr,trControl=fitControl,ntree=100)
+```
+#Display the model developed using the training dataset
+```{r}
+print(fit)
+```
+#validate the model by using the validation set
+```{r}
+pred1 <- predict(fit, newdata=tr_ts)
+cm<-confusionMatrix(pred1,tr_ts$classe)
+cm
+```
+## use the model for predicting the objects in test data set
+```{r}
+dat_s1<-dat_s[,-53]
+pred1 <- predict(fit, newdata=dat_s1)
+```
+#Display the predictions for the objects in test dataset
+```{r}
+pred1
+``` 
+#the random forest with out parllel programing approch is taking hours to generate the forest.reducing the number of trees in the random forest did not decreased the accuracy very much.
